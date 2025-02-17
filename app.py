@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 import csv
+import socket
 
 # Figuring out the redirects
 # Set verify = true, https
@@ -28,26 +29,39 @@ def get_response_status(link):
     response_url = ''
     try:
         # Making a get request
-        url = 'http://' + link
+        url = 'https://' + link
         response_url = url
         response = requests.head(url, timeout = 5)
+        ip = (get_ip_address(url))
         if 300 <= response.status_code < 400:
-            return str(response.status_code) + ": " + response.url
+            return str(response.status_code) + " ~ IP: " + ip + " ~ " +  url
         elif 200 <= response.status_code < 300:
-            r = requests.get(url, verify= False)
+            r = requests.get(url)
             soup = BeautifulSoup(r.text, 'html.parser')
-            return str(response.status_code) + ": " + soup.title.string + "~" + response.url
+            if soup.title:
+                return str(response.status_code) + ": " + soup.title.string + " ~ IP: " + ip +  " ~ " + url
+            else:
+                return str(response.status_code) + " ~ IP: " + ip + " ~ " + url
         else:
-            return str(response.status_code) + ": " + str(response.url)
-    except requests.exceptions.SSLError as e:
-        return e
+            return str(response.status_code) + ": " + " ~ IP: " + ip + " ~ " + url
+    except requests.exceptions.SSLError:
+        return "SSL Error for: " + response_url
     except requests.exceptions.ConnectTimeout:
         return "Connection Timeout for: " + response_url
+    except requests.exceptions.ReadTimeout:
+        return "Connection Read Timeout for: " + response_url
+    except requests.exceptions.TooManyRedirects:
+        return "Too many redirects for: " + response_url
+    except requests.exceptions.ProxyError:
+        return "Proxy Error for " + response_url
+    except requests.exceptions.ConnectionError:
+        return "Connection Error for " + response_url
     except Exception as e:
         return e
 
 def get_ip_address(url):
-    urlparse(url).hostname
+    hostname = urlparse(url).hostname
+    return socket.gethostbyname(hostname)
 
 with open('domains.csv', mode='r') as file:
     csvFile = csv.reader(file)
